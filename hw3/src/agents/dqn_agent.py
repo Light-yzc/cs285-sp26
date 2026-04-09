@@ -78,7 +78,7 @@ class DQNAgent(nn.Module):
             else:
                 next_action = next_qa_values.argmax(dim=-1)
 
-            next_q_values = next_qa_values.gather(dim=-1, index=next_action.unsqueeze(1)).squeeze()
+            next_q_values = next_qa_values.gather(dim=-1, index=next_action.unsqueeze(1)).squeeze(-1)
             assert next_q_values.shape == (batch_size,), next_q_values.shape
 
             target_values = reward + (1 - done) * self.discount * next_q_values # b
@@ -87,7 +87,7 @@ class DQNAgent(nn.Module):
 
         # TODO(Section 2.4): train the critic with the target values
         qa_values = self.critic(obs)
-        q_values = qa_values.gather(dim=-1, index=action.unsqueeze(1)).squeeze()
+        q_values = qa_values.gather(dim=-1, index=action.unsqueeze(1)).squeeze(-1)
         loss = self.critic_loss(q_values, target_values)
         # ENDTODO
 

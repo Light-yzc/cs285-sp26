@@ -89,8 +89,8 @@ class SoftActorCritic(nn.Module):
         if self.auto_tune_temperature:
             # TODO(Section 3.5): Initialize log_alpha, alpha_optimizer, and target_entropy
             # Hint: Initialize log_alpha to log(temperature) so alpha starts at the given temperature
-            self.log_alpha = nn.Parameter(torch.log(temperature))
-            self.alpha_optimizer = torch.optim.Adam(self.log_alpha, lr=alpha_learning_rate)
+            self.log_alpha = nn.Parameter(torch.log(torch.tensor(temperature)))
+            self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_learning_rate)
             self.target_entropy = -self.action_dim
             # ENDTODO
 
@@ -205,7 +205,7 @@ class SoftActorCritic(nn.Module):
             if self.use_entropy_bonus and self.backup_entropy:
                 # TODO(Section 3.3): Add entropy bonus to the target values for SAC
                 next_action_entropy = self.entropy(next_action_distribution) #bs, 
-                next_qs += self.temperature * next_action_entropy.unsqueeze(0) #num_critic, bs 
+                next_qs += self.get_temperature() * next_action_entropy.unsqueeze(0) #num_critic, bs 
                 # Hint: next_qs = ...
                 # ENDTODO
 
@@ -252,7 +252,7 @@ class SoftActorCritic(nn.Module):
         # TODO(Section 3.3): Compute the entropy of the action distribution.
         # Note: Think about whether to use .rsample() or .sample() here...
         action = action_distribution.rsample() #bs,
-        entropy = action_distribution.log_prob(action)
+        entropy = -action_distribution.log_prob(action)
         return entropy
         # ENDTODO
 
@@ -291,7 +291,7 @@ class SoftActorCritic(nn.Module):
         loss, entropy, log_prob = self.actor_loss_reparametrize(obs)
 
         # TODO(Section 3.3): Add the entropy bonus to the actor loss: loss -= [your entropy bonus here]
-        loss = loss - self.temperature * entropy
+        loss = loss - self.get_temperature() * entropy
         # ENDTODO
 
         self.actor_optimizer.zero_grad()
