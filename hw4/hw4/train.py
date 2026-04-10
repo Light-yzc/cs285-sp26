@@ -7,7 +7,7 @@ import gc
 import math
 from pathlib import Path
 from typing import Any, Dict, List
-
+import bitsandbytes as bnb
 import torch
 from tqdm import trange, tqdm
 
@@ -527,12 +527,21 @@ def main():
     if not trainable_params:
         raise RuntimeError("No trainable parameters found. LoRA setup failed.")
 
-    optimizer = torch.optim.AdamW(
+
+    try:
+        optimizer = bnb.optim.Adamw8bit(
         trainable_params,
         lr=cfg.lr,
         betas=(cfg.betas1, cfg.betas2),
         weight_decay=cfg.weight_decay,
-    )
+        )
+    except:
+        optimizer = torch.optim.AdamW(
+            trainable_params,
+            lr=cfg.lr,
+            betas=(cfg.betas1, cfg.betas2),
+            weight_decay=cfg.weight_decay,
+        )
 
     task = build_task(cfg)
     sampler = HFSampler(tokenizer=tokenizer, device=device)
