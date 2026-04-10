@@ -43,8 +43,13 @@ def compute_per_token_logprobs(
     #
     # Respect enable_grad: when enable_grad=False this function should not build an
     # autograd graph.
-    raise NotImplementedError("student TODO: compute_per_token_logprobs")
-
+    # raise NotImplementedError("student TODO: compute_per_token_logprobs")
+    with torch.set_grad_enabled(enable_grad):
+        out = model(input_ids=input_ids, attention_mask=attention_mask, use_cache=False)
+        out_shift_logits = out.logits[:, :-1, :]
+        B, L, V = out_shift_logits.shape
+        probs = -F.cross_entropy(out_shift_logits.reshape(-1, V), input_ids[:, 1:].reshape(-1), reduction='none')
+    return probs.reshape(B, L) #logprob shape ,bs, l-1
 
 def build_completion_mask(
     input_ids: torch.Tensor,
@@ -66,7 +71,16 @@ def build_completion_mask(
     # prompt_input_len is the (padded) prompt length before completion tokens were
     # appended. You can use attention_mask to exclude padding; pad_token_id is passed
     # for convenience but a direct attention-mask-based solution is fine.
-    raise NotImplementedError("student TODO: build_completion_mask")
+    # raise NotImplementedError("student TODO: build_completion_mask")
+    #p, p, p, c, c, p
+    #1, 1, 1, 1, 1, 0
+    #0, 0, 0, 1, 1, 0
+    #   0, 0, 1, 1, 0
+    mask = attention_mask.clone()
+    mask[:, :prompt_input_len] = 0
+    mask = mask[:, 1:]
+    return mask.float()
+
 
 
 def masked_sum(x: torch.Tensor, mask: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
@@ -110,4 +124,7 @@ def approx_kl_from_logprobs(
     #                             = KL(p_new || p_ref).
     #
     # The clamp to [-20, 20] is for numerical stability / variance control.
-    raise NotImplementedError("student TODO: approx_kl_from_logprobs")
+    # raise NotImplementedError("student TODO: approx_kl_from_logprobs")
+    delta = (ref_logprobs - new_logprobs).clamp(-log_ratio_clip, log_ratio_clip)
+    per_token_kl = torch.exp(delta) - delta - 1 #bs, l-1
+    return masked_mean(per_token_kl, mask, eps) #bs

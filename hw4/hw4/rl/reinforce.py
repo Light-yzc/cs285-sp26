@@ -65,7 +65,7 @@ class Reinforce(RLAlgorithm):
             #
             # Shapes:
             # - mb.input_ids and mb.attention_mask: [B_mb, L]
-            # - new_logp, mb.ref_logprobs, mask: [B_mb, L-1]
+            # - new_logp, mb.ref_logprobs, mask: [B_mb, L-1] ##shift ingnore first
             # - adv: [B_mb]
             #
             # The rollout already cached mb.ref_logprobs under the frozen reference.
@@ -87,9 +87,13 @@ class Reinforce(RLAlgorithm):
             # 4. kl = approx_kl_from_logprobs(new_logp, mb.ref_logprobs, mask)
             # 5. entropy = -masked_mean(new_logp, mask) for LOGGING ONLY
             #    (do not add an entropy term to the loss)
-            raise NotImplementedError("student TODO: Reinforce.update minibatch computations")
-
-            loss = (pg_loss + cfg.kl_coef * kl) / max(1, grad_accum_steps)
+            # raise NotImplementedError("student TODO: Reinforce.update minibatch computations")
+            new_logp =compute_per_token_logprobs(model, mb.input_ids, mb.attention_mask) #bs ,l-1
+            avg_prob = (mb.completion_mask * new_logp).sum(dim=1) / (mb.completion_mask.sum(dim=1) + 1e-8) #bs
+            pg_loss = (avg_prob * adv).mean()
+            kl = approx_kl_from_logprobs(new_logp, mb.ref_logprobs, mb.completion_mask)
+            entropy = -masked_mean(new_logp, mask)
+            loss = (-pg_loss + cfg.kl_coef * kl) / max(1, grad_accum_steps)
             if not torch.isfinite(loss):
                 skipped_nonfinite += 1
                 optimizer.zero_grad(set_to_none=True)

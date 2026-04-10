@@ -49,4 +49,34 @@ def iter_minibatches(
     # - Slice ALL tensor fields consistently with the same minibatch indices.
     # - Keep task_names / completion_texts aligned with the same indices when present.
     # - If device is not None, move the minibatch to that device before yielding.
-    raise NotImplementedError("student TODO: iter_minibatches")
+    # raise NotImplementedError("student TODO: iter_minibatches")
+
+    N = batch.input_ids.shape[0]
+    if shuffle:
+        index = torch.randperm(N, generator=generator)
+    else:
+        index = torch.arange(0, N, device=device)
+    
+    for i in range(0, N, minibatch_size):
+        if i + minibatch_size < N:
+            cur_index = index[i:i+minibatch_size]
+        else:
+            cur_index = index[i:]
+        task_names = [batch.task_names[i] for i in cur_index.tolist()]
+        completion_texts = [batch.completion_texts[i] for i in cur_index.tolist()]
+
+        yield RolloutBatch(
+            input_ids=batch.input_ids[cur_index],
+            attention_mask=batch.attention_mask[cur_index],
+            completion_mask=batch.completion_mask[cur_index],
+            old_logprobs=batch.old_logprobs[cur_index],
+            ref_logprobs=batch.ref_logprobs[cur_index],
+            rewards=batch.rewards[cur_index],
+            advantages=batch.advantages[cur_index],
+            task_names=task_names,
+            completion_texts=completion_texts
+        ).to(device=device)
+
+    
+
+        
