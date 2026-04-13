@@ -64,8 +64,11 @@ class SACBCAgent(nn.Module):
         Update Q(s, a)
         """
         # TODO(student): Compute the Q loss
-        q = ...
-        loss = ...
+        with torch.no_grad():
+            next_ac = self.actor(next_observations).sample()
+            target_y = rewards + (1 - dones) * self.discount * 1/2 * self.target_critic(next_observations, next_ac).sum(dim=0)
+        q = self.critic(observations, actions) #n ,bs,
+        loss = nn.functional.mse_loss(q, target_y.unsqueeze(0))
 
         self.critic_optimizer.zero_grad()
         loss.backward()
@@ -88,12 +91,15 @@ class SACBCAgent(nn.Module):
         Update the actor
         """
         # TODO(student): Compute the actor loss
-        q_loss = ...
-
-        mses = ...
-        bc_loss = ...
-
-        entropy_loss = ...
+        ac_distribution:torch.distributions.Distribution = self.actor(observations)
+        ac = ac_distribution.rsample()
+        log_prob = ac_distribution.log_prob(ac)
+        q_value = self.critic(observations, ac)
+        q_value = q_value.mean(dim=0)
+        q_loss = -q_value.mean()
+        mses = nn.functional.mse_loss(ac, actions)
+        bc_loss = self.alpha * mses
+        entropy_loss = self.beta * log_prob.mean()
 
         loss = q_loss + bc_loss + entropy_loss
 
@@ -121,7 +127,7 @@ class SACBCAgent(nn.Module):
         actor_actions = actor_dists.rsample()
         log_probs = actor_dists.log_prob(actor_actions)
 
-        loss = self.beta() * (-log_probs - self.target_entropy).detach().mean()
+        loss = self.beta * (-log_probs - self.target_entropy).detach().mean()
 
         self.beta_optimizer.zero_grad()
         loss.backward()
@@ -156,4 +162,7 @@ class SACBCAgent(nn.Module):
 
     def update_target_critic(self) -> None:
         # TODO(student): Update target_critic using Polyak averaging with self.target_update_rate
-        ...
+        with torch.no_grad():
+            for target_param, param in zip(self.target_critic.parameters(), self.critic.parameters()):
+                target_param.mul_(1 - self.target_update_rate)
+                target_param.add_(self.target_update_rate * param)
