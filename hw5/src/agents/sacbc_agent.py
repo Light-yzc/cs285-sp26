@@ -99,7 +99,7 @@ class SACBCAgent(nn.Module):
         q_loss = -q_value.mean()
         mses = nn.functional.mse_loss(ac, actions)
         bc_loss = self.alpha * mses
-        entropy_loss = self.beta * log_prob.mean()
+        entropy_loss = self.beta() * log_prob.mean()
 
         loss = q_loss + bc_loss + entropy_loss
 
@@ -127,7 +127,7 @@ class SACBCAgent(nn.Module):
         actor_actions = actor_dists.rsample()
         log_probs = actor_dists.log_prob(actor_actions)
 
-        loss = self.beta * (-log_probs - self.target_entropy).detach().mean()
+        loss = self.beta() * (-log_probs - self.target_entropy).detach().mean()
 
         self.beta_optimizer.zero_grad()
         loss.backward()
