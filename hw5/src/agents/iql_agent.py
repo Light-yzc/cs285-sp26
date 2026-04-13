@@ -74,8 +74,8 @@ class IQLAgent(nn.Module):
         # TODO(student): Compute the value loss
         v = self.value(observations)
         with torch.no_grad():
-            adv = self.target_critic(observations, actions).min(dim=0).values - v
-        loss = self.iql_expectile_loss(adv, self.expectile).mean()
+            adv = self.target_critic(observations, actions).min(dim=0).values
+        loss = self.iql_expectile_loss(adv - v, self.expectile).mean()
 
         self.value_optimizer.zero_grad()
         loss.backward()
