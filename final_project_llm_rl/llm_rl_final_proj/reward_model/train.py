@@ -301,6 +301,7 @@ def main() -> None:
         with open(meta_path, 'r') as f:
             meta = json.load(f)
         optimizer_step = int(meta['step'])
+        print(f'resume from {optimizer_step} step....')
     microbatch_count = 0
     train_start = time.perf_counter()
 
