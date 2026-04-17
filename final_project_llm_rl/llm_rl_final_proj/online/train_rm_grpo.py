@@ -63,6 +63,7 @@ class OnlineRMGRPOConfig:
     weight_decay: float = 0.0
     betas1: float = 0.9
     betas2: float = 0.95
+    optimizer: str = "adamw_8bit"
     warmup_steps: int = 20
     grad_accum_steps: int = 1
     max_grad_norm: float = 0.5
@@ -133,6 +134,12 @@ def parse_args() -> OnlineRMGRPOConfig:
     ap.add_argument("--weight_decay", type=float, default=OnlineRMGRPOConfig.weight_decay)
     ap.add_argument("--betas1", type=float, default=OnlineRMGRPOConfig.betas1)
     ap.add_argument("--betas2", type=float, default=OnlineRMGRPOConfig.betas2)
+    ap.add_argument(
+        "--optimizer",
+        type=str,
+        default=OnlineRMGRPOConfig.optimizer,
+        choices=["adamw", "adamw_8bit"],
+    )
     ap.add_argument("--warmup_steps", type=int, default=OnlineRMGRPOConfig.warmup_steps)
     ap.add_argument("--grad_accum_steps", type=int, default=OnlineRMGRPOConfig.grad_accum_steps)
     ap.add_argument("--max_grad_norm", type=float, default=OnlineRMGRPOConfig.max_grad_norm)
@@ -238,6 +245,30 @@ def _build_online_algo(cfg: OnlineRMGRPOConfig):
     if cfg.algo == "gspo":
         return GSPO(algo_cfg)
     raise ValueError(f"Unsupported --algo {cfg.algo}")
+
+
+def _build_policy_optimizer(cfg: OnlineRMGRPOConfig, policy_model: torch.nn.Module) -> torch.optim.Optimizer:
+    trainable_params = [p for p in policy_model.parameters() if p.requires_grad]
+    if cfg.optimizer == "adamw_8bit":
+        try:
+            import bitsandbytes as bnb
+        except ImportError as exc:
+            raise ImportError(
+                "Requested --optimizer adamw_8bit, but bitsandbytes is not installed. "
+                "Install it with `uv sync --extra remote`."
+            ) from exc
+        return bnb.optim.AdamW8bit(
+            trainable_params,
+            lr=cfg.lr,
+            betas=(cfg.betas1, cfg.betas2),
+            weight_decay=cfg.weight_decay,
+        )
+    return torch.optim.AdamW(
+        trainable_params,
+        lr=cfg.lr,
+        betas=(cfg.betas1, cfg.betas2),
+        weight_decay=cfg.weight_decay,
+    )
 
 
 def _algo_divides_advantages_by_std(algo: str) -> bool:
@@ -452,12 +483,7 @@ def main() -> None:
     for p in reward_model.parameters():
         p.requires_grad_(False)
 
-    optimizer = torch.optim.AdamW(
-        [p for p in policy_model.parameters() if p.requires_grad],
-        lr=cfg.lr,
-        betas=(cfg.betas1, cfg.betas2),
-        weight_decay=cfg.weight_decay,
-    )
+    optimizer = _build_policy_optimizer(cfg, policy_model)
     algo = _build_online_algo(cfg)
     sampler = HFSampler(policy_tokenizer, device=device)
     sampling_cfg = SamplingConfig(
@@ -600,6 +626,7 @@ def main() -> None:
             "rollout/completion_max_tokens": float(completion_lengths.max().item()),
             "rollout/count_completions": float(rewards.numel()),
             "train/learning_rate": float(optimizer.param_groups[0]["lr"]),
+            "train/optimizer_is_8bit": float(cfg.optimizer == "adamw_8bit"),
             "time/seconds_since_start": float(time.time() - start_time),
             **train_metrics,
             **get_cuda_memory_metrics(prefix="train"),

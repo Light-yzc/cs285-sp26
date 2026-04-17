@@ -289,23 +289,25 @@ def main() -> None:
         logger.log(eval_metrics, step=step)
         model.train()
         return eval_metrics
-
-    baseline_eval = run_eval(step=0, phase="baseline")
-    print("[eval][baseline]", json.dumps(baseline_eval, indent=2, sort_keys=True))
+    if cfg.resume == '':
+        baseline_eval = run_eval(step=0, phase="baseline")
+        print("[eval][baseline]", json.dumps(baseline_eval, indent=2, sort_keys=True))
 
     model.train()
     optimizer.zero_grad(set_to_none=True)
     optimizer_step = 0
+    progress = tqdm(total=estimated_total_optimizer_steps, desc="train[reward_model]", dynamic_ncols=True)
+
     if cfg.resume != '':
         meta_path = Path(cfg.resume).parent / 'meta.json'
         with open(meta_path, 'r') as f:
             meta = json.load(f)
         optimizer_step = int(meta['step'])
         print(f'resume from {optimizer_step} step....')
+        progress.update(optimizer_step)
     microbatch_count = 0
     train_start = time.perf_counter()
 
-    progress = tqdm(total=estimated_total_optimizer_steps, desc="train[reward_model]", dynamic_ncols=True)
     while optimizer_step < estimated_total_optimizer_steps:
         for batch in train_loader:
             batch = batch.to(device)
