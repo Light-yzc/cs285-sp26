@@ -45,10 +45,11 @@ def iter_minibatches(
     # and yield RolloutBatch objects containing the selected subset.
     # raise NotImplementedError("Implement iter_minibatches in the student starter.")
     bs = batch.input_ids.shape[0]
+    index_device = batch.input_ids.device
     if shuffle:
-        indices = torch.randperm(bs, generator=generator)
+        indices = torch.randperm(bs, generator=generator, device=index_device)
     else:
-        indices = torch.arange(0, bs)
+        indices = torch.arange(0, bs, device=index_device)
     
     for i in range(0, bs, minibatch_size):
         if i + minibatch_size < bs: 
