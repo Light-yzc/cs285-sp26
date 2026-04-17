@@ -7,7 +7,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
-
+import json
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -295,6 +296,11 @@ def main() -> None:
     model.train()
     optimizer.zero_grad(set_to_none=True)
     optimizer_step = 0
+    if cfg.resume != '':
+        meta_path = Path(cfg.resume).parent / 'meta.json'
+        with open(meta_path, 'r') as f:
+            meta = json.load(f)
+        optimizer_step = int(meta['step'])
     microbatch_count = 0
     train_start = time.perf_counter()
 
