@@ -217,6 +217,7 @@ def load_lora_reward_model_and_tokenizer(
     lora_dropout: float = 0.05,
     lora_target_modules: Sequence[str] = ("q_proj", "k_proj", "v_proj", "o_proj"),
     lora_bias: str = "none",
+    resume_path:str = 'none'
 ) -> LoadedRewardModel:
     tokenizer = _prepare_tokenizer(model_name)
     base = AutoModelForSequenceClassification.from_pretrained(
@@ -235,17 +236,19 @@ def load_lora_reward_model_and_tokenizer(
     normalized_targets = _normalize_targets(lora_target_modules)
     matched_targets = _filter_existing_target_suffixes(base, normalized_targets)
     modules_to_save = _detect_reward_head_modules_to_save(base)
-
-    lora_cfg = LoraConfig(
-        task_type=TaskType.SEQ_CLS,
-        r=int(lora_r),
-        lora_alpha=int(lora_alpha),
-        lora_dropout=float(lora_dropout),
-        target_modules=matched_targets,
-        modules_to_save=modules_to_save or None,
-        bias=lora_bias,
-    )
-    model = get_peft_model(base, lora_cfg)
+    if resume_path:
+        model = PeftModel.from_pretrained(base, resume_path)
+    else:
+        lora_cfg = LoraConfig(
+            task_type=TaskType.SEQ_CLS,
+            r=int(lora_r),
+            lora_alpha=int(lora_alpha),
+            lora_dropout=float(lora_dropout),
+            target_modules=matched_targets,
+            modules_to_save=modules_to_save or None,
+            bias=lora_bias,
+        )
+        model = get_peft_model(base, lora_cfg)
     model.to(device)
 
     if grad_checkpointing:

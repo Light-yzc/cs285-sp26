@@ -29,6 +29,7 @@ from llm_rl_final_proj.utils.hardware import (
 )
 from llm_rl_final_proj.utils.seed import set_seed
 from llm_rl_final_proj.utils.wandb_utils import WandBLogger
+from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer, PreTrainedTokenizerBase
 
 
 @dataclass
@@ -71,6 +72,9 @@ class RewardModelConfig:
     wandb_project: str = "llm-rl-final-project"
     wandb_name: str = "reward_model"
     wandb_enabled: bool = True
+    resume: str = ""
+
+
 
 
 def parse_args() -> RewardModelConfig:
@@ -121,6 +125,8 @@ def parse_args() -> RewardModelConfig:
         action=argparse.BooleanOptionalAction,
         default=RewardModelConfig.wandb_enabled,
     )
+
+    ap.add_argument('--resume', type=str, default='')
     args = ap.parse_args()
     return RewardModelConfig(**vars(args))
 
@@ -152,6 +158,7 @@ def save_checkpoint(model: torch.nn.Module, cfg: RewardModelConfig, step: int) -
         "eval_split": cfg.eval_split,
     }
     (ckpt_dir / "meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
+
 
 
 def _compute_pair_metrics(chosen_scores: torch.Tensor, rejected_scores: torch.Tensor) -> Dict[str, float]:
@@ -210,6 +217,7 @@ def main() -> None:
         lora_dropout=cfg.lora_dropout,
         lora_target_modules=_normalize_lora_target_modules(cfg.lora_target_modules),
         lora_bias=cfg.lora_bias,
+        resume_path=cfg.resume
     )
     model = loaded.model
     tokenizer = loaded.tokenizer
